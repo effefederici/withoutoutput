@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>w i t h o u t p u t</title>
+<style>
+  body {
+    margin: 0;
+    background: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  canvas {
+    display: block;
+    width: 700px;
+    height: 700px;
+    border: 1px solid #000;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c" width="800" height="800"></canvas>
+
+<script>
+const c = document.getElementById("c");
+const ctx = c.getContext("2d");
+
+const layers = 15;
+const neuronsPerLayer = 10;
+const neuronRadius = 4;
+let t = 0;
+
+/* --- generazione della rete --- */
+let network = [];
+let leftBound = Infinity;
+let rightBound = -Infinity;
+let topBound = Infinity;
+let bottomBound = -Infinity;
+
+for (let i = 0; i < layers; i++) {
+  let layer = [];
+  for (let j = 0; j < neuronsPerLayer; j++) {
+    const x = c.width / 2 + (j - neuronsPerLayer/2) * 50;
+    const y = 50 + i * 50;
+    layer.push({ x, y, active: Math.random() < 0.5 });
+
+    leftBound = Math.min(leftBound, x - neuronRadius);
+    rightBound = Math.max(rightBound, x + neuronRadius);
+    topBound = Math.min(topBound, y - neuronRadius);
+    bottomBound = Math.max(bottomBound, y + neuronRadius);
+  }
+  network.push(layer);
+}
+
+/* --- connessioni tra neuroni --- */
+function drawConnections() {
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i < network.length - 1; i++) {
+    const layerA = network[i];
+    const layerB = network[i+1];
+    layerA.forEach(a => {
+      layerB.forEach(b => {
+        if (Math.random() < 0.5) {
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      });
+    });
+  }
+}
+
+/* --- neuroni --- */
+function drawNeurons() {
+  network.forEach(layer => {
+    layer.forEach(n => {
+      n.active = Math.random() < 0.02 ? !n.active : n.active;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, neuronRadius, 0, Math.PI*2);
+      ctx.fillStyle = n.active ? "black" : "rgba(0,0,0,0.1)";
+      ctx.fill();
+    });
+  });
+}
+
+/* --- word noise laterale --- */
+const words = [
+  "death", "waiting", "void", "space",
+  "time", "remainder", "echo", "sign",
+  "shadow", "end", "stasis", "nothingness"
+];
+
+let noiseWords = [];
+const padding = 12;
+const wordFont = "14px monospace";
+
+function spawnWord() {
+  ctx.font = wordFont;
+  const text = words[Math.floor(Math.random() * words.length)];
+  const textWidth = ctx.measureText(text).width;
+
+  const side = Math.random() < 0.5 ? "left" : "right";
+  let xMin, xMax;
+
+  if (side === "left") {
+    xMin = padding;
+    xMax = leftBound - padding - textWidth;
+  } else {
+    xMin = rightBound + padding;
+    xMax = c.width - padding - textWidth;
+  }
+
+  if (xMax <= xMin) return;
+
+  const yMin = padding;
+  const yMax = c.height - padding;
+  const x = xMin + Math.random() * (xMax - xMin);
+  const y = yMin + Math.random() * (yMax - yMin);
+
+  noiseWords.push({
+    text,
+    x,
+    y,
+    baseY: y,
+    life: 0,
+    maxLife: 60 + Math.random() * 40,
+    phase: Math.random() * Math.PI * 2 // per oscillazione
+  });
+}
+
+/* --- draw loop --- */
+function draw() {
+  ctx.clearRect(0,0,c.width,c.height);
+
+  drawConnections();
+  drawNeurons();
+
+  // spawn
+  if (Math.random() < 0.02) spawnWord();
+  ctx.font = wordFont;
+
+  noiseWords.forEach(w => {
+    w.life++;
+    // oscillazione verticale lenta
+    const amplitude = 6; // px
+    const speed = 0.02;
+    w.y = w.baseY + Math.sin(w.phase + t * speed) * amplitude;
+
+    // alpha fade in/out
+    ctx.globalAlpha = Math.sin(Math.PI * w.life / w.maxLife);
+    ctx.fillStyle = "black";
+    ctx.fillText(w.text, w.x, w.y);
+  });
+  ctx.globalAlpha = 1;
+  noiseWords = noiseWords.filter(w => w.life < w.maxLife);
+
+  t += 0.1;
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+
+</body>
+</html>
